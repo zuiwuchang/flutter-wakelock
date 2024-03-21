@@ -1,5 +1,7 @@
+import 'dart:io';
+
 import 'package:flutter/material.dart';
-import 'package:flutter/widgets.dart';
+import 'package:wake/auto.dart';
 import 'package:wakelock/wakelock.dart';
 
 void main() {
@@ -33,7 +35,7 @@ class MyHomePage extends StatefulWidget {
 
 class _MyHomePageState extends State<MyHomePage> {
   var _disabled = false;
-  var _err;
+  dynamic _err;
   _enable(bool ok) async {
     setState(() {
       _disabled = true;
@@ -42,6 +44,37 @@ class _MyHomePageState extends State<MyHomePage> {
     try {
       await (ok ? Wakelock.enable() : Wakelock.disable());
       setState(() {
+        _disabled = false;
+      });
+    } catch (e) {
+      setState(() {
+        _err = e;
+        _disabled = false;
+      });
+    }
+  }
+
+  _auto() async {
+    setState(() {
+      _disabled = true;
+      _err = null;
+    });
+    try {
+      final enabled = !Platform.isAndroid ? true : await Wakelock.enabled;
+      if (!enabled) {
+        await Wakelock.enable();
+      }
+      if (context.mounted) {
+        // ignore: use_build_context_synchronously
+        await Navigator.of(context).push(MaterialPageRoute(
+          builder: (_) => const MyAutoPage(),
+        ));
+      }
+      if (!enabled) {
+        await Wakelock.disable();
+      }
+      setState(() {
+        _err = null;
         _disabled = false;
       });
     } catch (e) {
@@ -68,6 +101,10 @@ class _MyHomePageState extends State<MyHomePage> {
           TextButton(
             onPressed: _disabled ? null : () => _enable(false),
             child: const Text('disable wakelock'),
+          ),
+          TextButton(
+            onPressed: _disabled ? null : () => _auto(),
+            child: const Text('auto wakelock'),
           ),
           _err == null
               ? Container()
