@@ -1,7 +1,4 @@
-import 'dart:io';
-
 import 'package:flutter/material.dart';
-import 'package:wake/auto.dart';
 import 'package:wakelock/wakelock.dart';
 
 void main() {
@@ -34,104 +31,100 @@ class MyHomePage extends StatefulWidget {
 }
 
 class _MyHomePageState extends State<MyHomePage> {
-  var _disabled = false;
-  dynamic _err;
-  _enable(bool ok) async {
-    setState(() {
-      _disabled = true;
-      _err = null;
-    });
-    try {
-      await (ok ? Wakelock.enable() : Wakelock.disable());
-      setState(() {
-        _disabled = false;
-      });
-    } catch (e) {
-      setState(() {
-        _err = e;
-        _disabled = false;
-      });
-    }
+  TextEditingController controller = TextEditingController();
+  @override
+  void dispose() {
+    controller.dispose();
+    super.dispose();
   }
 
-  _auto() async {
-    setState(() {
-      _disabled = true;
-      _err = null;
-    });
+  dynamic _err;
+  bool enabled = false;
+  @override
+  void initState() {
+    super.initState();
+    _init();
+  }
+
+  _init() async {
     try {
-      final enabled = !Platform.isAndroid ? true : await Wakelock.enabled;
-      if (!enabled) {
-        await Wakelock.enable();
-      }
-      if (context.mounted) {
-        // ignore: use_build_context_synchronously
-        await Navigator.of(context).push(MaterialPageRoute(
-          builder: (_) => const MyAutoPage(),
-        ));
-      }
-      if (!enabled) {
-        await Wakelock.disable();
-      }
+      await Wakelock.enable();
+      final ok = await Wakelock.enabled;
       setState(() {
-        _err = null;
-        _disabled = false;
+        enabled = ok;
       });
     } catch (e) {
       setState(() {
         _err = e;
-        _disabled = false;
       });
     }
   }
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(
-        backgroundColor: Theme.of(context).colorScheme.inversePrimary,
-        title: Text(widget.title),
-      ),
-      body: ListView(
-        children: [
-          TextButton(
-            onPressed: _disabled ? null : () => _enable(true),
-            child: const Text('enable wakelock'),
-          ),
-          TextButton(
-            onPressed: _disabled ? null : () => _enable(false),
-            child: const Text('disable wakelock'),
-          ),
-          TextButton(
-            onPressed: _disabled ? null : () => _auto(),
-            child: const Text('auto wakelock'),
-          ),
-          _err == null
-              ? Container()
-              : Container(
-                  padding: const EdgeInsets.only(left: 8, right: 8),
-                  child: Wrap(
-                    children: [
-                      Text(
-                        "$_err",
-                        style: TextStyle(
-                            color: Theme.of(context).colorScheme.error),
-                      ),
-                    ],
+    // ignore: deprecated_member_use
+    return WillPopScope(
+      onWillPop: () async {
+        if (_err != null) {
+          return true;
+        }
+        final yes = await showDialog<bool>(
+          context: context,
+          builder: (BuildContext context) {
+            return AlertDialog(
+              title: const Text("quit"),
+              content: SingleChildScrollView(
+                child: TextField(
+                  decoration: const InputDecoration(
+                    labelText: "Enter 123 to confirm quit",
                   ),
+                  keyboardType: TextInputType.number,
+                  autofocus: true,
+                  controller: controller,
                 ),
-          FutureBuilder(
-            future: Wakelock.enabled,
-            builder: (context, AsyncSnapshot<bool> snapshot) {
-              final data = snapshot.data;
-              if (data == null) {
-                return Container();
-              }
-              return Text('The wakelock is currently '
-                  '${data ? 'enabled' : 'disabled'}.');
-            },
-          ),
-        ],
+              ),
+              actions: <Widget>[
+                TextButton(
+                  child: Text(MaterialLocalizations.of(context).okButtonLabel),
+                  onPressed: () => Navigator.of(context)
+                      .pop(controller.text.trim() == '123'),
+                ),
+                TextButton(
+                  child:
+                      Text(MaterialLocalizations.of(context).closeButtonLabel),
+                  onPressed: () => Navigator.of(context).pop(false),
+                ),
+              ],
+            );
+          },
+        );
+        return yes ?? false;
+      },
+      child: Scaffold(
+        appBar: AppBar(
+          backgroundColor: Theme.of(context).colorScheme.inversePrimary,
+          title: Text(widget.title),
+        ),
+        body: ListView(
+          children: [
+            _err == null
+                ? Container()
+                : Container(
+                    padding: const EdgeInsets.only(left: 8, right: 8),
+                    child: Wrap(
+                      children: [
+                        Text(
+                          "$_err",
+                          style: TextStyle(
+                              color: Theme.of(context).colorScheme.error),
+                        ),
+                      ],
+                    ),
+                  ),
+            Text('The wakelock is currently '
+                '${enabled ? 'enabled' : 'disabled'}.'),
+          ],
+        ),
       ),
     );
   }
